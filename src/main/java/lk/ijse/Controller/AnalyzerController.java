@@ -30,20 +30,16 @@ import org.jfree.data.xy.XYSeriesCollection;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.itextpdf.io.font.cmap.CMapContentParser.toHex;
-
 public class AnalyzerController {
 
     @FXML
-    private TextField hostField;
+    private TextField hostsField;
 
     @FXML
     private TextArea resultArea;
@@ -54,123 +50,144 @@ public class AnalyzerController {
     @FXML
     private LineChart<Number, Number> latencyChart;
 
-    private XYChart.Series<Number, Number> series;
-    private XYSeries jFreeSeries;
-    private int timeCounter = 0;
+    private Map<String, XYChart.Series<Number, Number>> seriesMap;
+    private Map<String, XYSeries> jFreeSeriesMap;
+    private Map<String, List<Double>> latencyMap;
     private AtomicBoolean running = new AtomicBoolean(false);
-    private List<Double> latencyData = new ArrayList<>();
-
-
 
     @FXML
     public void initialize() {
-        series = new XYChart.Series<>();
-        latencyChart.getData().add(series);
-        jFreeSeries = new XYSeries("Latency");
+        seriesMap = new HashMap<>();
+        jFreeSeriesMap = new HashMap<>();
+        latencyMap = new HashMap<>();
     }
 
     @FXML
     private void analyzeLatency() {
-        String host = hostField.getText();
-        if (host.isEmpty()) {
+        String hostsInput = hostsField.getText();
+        if (hostsInput.isEmpty()) {
             resultArea.setText("Please enter at least one host.");
             return;
         }
-      /*  String[] hosts = hostsInput.split(",");
+
+        String[] hosts = hostsInput.split(",");
+        latencyMap.clear();
+        seriesMap.clear();
+        jFreeSeriesMap.clear();
+        latencyChart.getData().clear();
+        recommendationArea.clear(); // Clear recommendations initially
+
         for (String host : hosts) {
             host = host.trim();
             if (!host.isEmpty()) {
-                analyzeSingleHost(host);
+                latencyMap.put(host, new ArrayList<>());
+                XYChart.Series<Number, Number> series = new XYChart.Series<>();
+                series.setName(host);
+                seriesMap.put(host, series);
+                latencyChart.getData().add(series);
+                jFreeSeriesMap.put(host, new XYSeries(host));
             }
-        }*/
-
+        }
 
         running.set(true);
         new Thread(() -> {
             while (running.get()) {
-                try {
-                    String os = System.getProperty("os.name").toLowerCase();
-                    String command;
-                    if (os.contains("win")) {
-                        command = "ping -n 1 " + host; // Windows
-                    } else {
-                        command = "ping -4 -c 1  " + host; // Unix/Linux/MacOS
-                    }
+                for (String host : hosts) {
+                    host = host.trim();
+                    if (host.isEmpty()) continue;
 
-                    Process process = Runtime.getRuntime().exec(command);
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                    String line;
-                    StringBuilder output = new StringBuilder();
-
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println("DEBUG: " + line); // Debug print for each line of output
-                        output.append(line).append("\n");
-                        Matcher matcher = Pattern.compile("time=(\\d+\\.\\d*) ms").matcher(line);
-                        if (matcher.find()) {
-                            double latency = Double.parseDouble(matcher.group(1));
-                            Platform.runLater(() -> updateChart(latency));
+                    try {
+                        String os = System.getProperty("os.name").toLowerCase();
+                        String command;
+                        if (os.contains("win")) {
+                            command = "ping -n 1 " + host; // Windows
+                        } else {
+                            command = "ping -4 -c 1 " + host; // Unix/Linux/MacOS
                         }
-                    }
 
-                    int exitCode = process.waitFor();
-                    if (exitCode == 0) {
-                        Platform.runLater(() -> resultArea.setText(output.toString()));
-                    } else {
-                        Platform.runLater(() -> resultArea.setText("Error executing ping command."));
-                    }
+                        Process process = Runtime.getRuntime().exec(command);
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                        String line;
+                        StringBuilder output = new StringBuilder();
 
-                    Thread.sleep(1000);  // Wait 1 second before next ping
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Platform.runLater(() -> resultArea.setText("An error occurred: " + e.getMessage()));
+                        while ((line = reader.readLine()) != null) {
+                            output.append(line).append("\n");
+                            Matcher matcher = Pattern.compile("time=(\\d+\\.\\d*) ms").matcher(line);
+                            if (matcher.find()) {
+                                double latency = Double.parseDouble(matcher.group(1));
+                                latencyMap.get(host).add(latency);
+                                String finalHost = host;
+                                Platform.runLater(() -> updateChart(latency, finalHost));
+                            }
+                        }
+
+                        int exitCode = process.waitFor();
+                        if (exitCode == 0) {
+                            Platform.runLater(() -> resultArea.setText(output.toString()));
+                        } else {
+                            String finalHost1 = host;
+                            Platform.runLater(() -> resultArea.setText("Error executing ping command for host: " + finalHost1));
+                        }
+
+                        Thread.sleep(1000);  // Wait 1 second before next ping
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        String finalHost2 = host;
+                        Platform.runLater(() -> resultArea.setText("An error occurred for host " + finalHost2 + ": " + e.getMessage()));
+                    }
                 }
             }
         }).start();
     }
-
-
-
-
-
 
     @FXML
     private void stopAnalysis() {
         running.set(false);
     }
 
-    private void updateChart(double latency) {
+    private void updateChart(double latency, String host) {
+        XYChart.Series<Number, Number> series = seriesMap.get(host);
+        XYSeries jFreeSeries = jFreeSeriesMap.get(host);
+        int timeCounter = series.getData().size();
 
         series.getData().add(new XYChart.Data<>(timeCounter, latency));
         jFreeSeries.add(timeCounter, latency);
-        latencyData.add(latency);
-        timeCounter++;
         if (series.getData().size() > 20) {
             series.getData().remove(0);
         }
 
+        // Update recommendations for all hosts
         String recommendations = analyzeLatencyData();
         recommendationArea.setText(recommendations);
     }
 
     private String analyzeLatencyData() {
-        if (latencyData.isEmpty()) {
-            return "No latency data available for analysis.";
-        }
-
-        double maxLatency = latencyData.stream().mapToDouble(v -> v).max().orElse(0.0);
-        double averageLatency = latencyData.stream().mapToDouble(v -> v).average().orElse(0.0);
-
         StringBuilder recommendations = new StringBuilder();
+        for (Map.Entry<String, List<Double>> entry : latencyMap.entrySet()) {
+            String host = entry.getKey();
+            List<Double> latencyData = entry.getValue();
 
-        recommendations.append(String.format("Maximum Latency: %.2f ms\n", maxLatency));
-        recommendations.append(String.format("Average Latency: %.2f ms\n", averageLatency));
+            if (latencyData.isEmpty()) {
+                recommendations.append("Host: ").append(host).append("\nNo latency data available for analysis.\n\n");
+                continue;
+            }
 
-        if (averageLatency < 100) {
-            recommendations.append("Latency is good. Your network performance is excellent.\n");
-        } else if (averageLatency < 200) {
-            recommendations.append("Latency is acceptable. Your network performance is decent but could be improved.\n");
-        } else {
-            recommendations.append("Latency is poor. Consider checking your network connection or contacting your ISP.\n");
+            double maxLatency = latencyData.stream().mapToDouble(v -> v).max().orElse(0.0);
+            double averageLatency = latencyData.stream().mapToDouble(v -> v).average().orElse(0.0);
+
+            recommendations.append("Host: ").append(host).append("\n");
+            recommendations.append(String.format("Maximum Latency: %.2f ms\n", maxLatency));
+            recommendations.append(String.format("Average Latency: %.2f ms\n", averageLatency));
+
+            if (averageLatency < 100) {
+                recommendations.append("Latency is good. Your network performance is excellent.\n");
+            } else if (averageLatency < 200) {
+                recommendations.append("Latency is acceptable. Your network performance is decent but could be improved.\n");
+            } else {
+                recommendations.append("Latency is poor. Consider checking your network connection or contacting your ISP.\n");
+            }
+
+            recommendations.append("\n");
         }
 
         return recommendations.toString();
@@ -199,80 +216,102 @@ public class AnalyzerController {
         com.itextpdf.kernel.pdf.PdfDocument pdf = new com.itextpdf.kernel.pdf.PdfDocument(writer);
         Document document = new Document(pdf);
 
-        // Load fonts
         PdfFont titleFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD);
         PdfFont textFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA);
 
-        // Add Title
         document.add(new Paragraph("Network Latency Report")
                 .setTextAlignment(TextAlignment.CENTER)
                 .setFont(titleFont)
                 .setFontSize(20)
                 .setBold()
                 .setFontColor(ColorConstants.BLUE));
-
-        // Add some space
         document.add(new Paragraph("\n"));
 
-        // Add Host Information
-        document.add(new Paragraph("Host: " + hostField.getText())
+        document.add(new Paragraph("Hosts: " + hostsField.getText())
                 .setFont(textFont)
                 .setFontSize(12)
                 .setFontColor(ColorConstants.BLACK));
-
-        // Add some space
         document.add(new Paragraph("\n"));
 
-        // Add Results
         document.add(new Paragraph("Results:")
                 .setFont(titleFont)
                 .setFontSize(14)
                 .setBold()
                 .setFontColor(ColorConstants.DARK_GRAY));
 
-        String[] results = resultArea.getText().split("\n");
-        for (String result : results) {
-            document.add(new Paragraph(result)
+        for (String host : hostsField.getText().split(",")) {
+            host = host.trim();
+            if (host.isEmpty()) continue;
+
+            document.add(new Paragraph("Host: " + host)
                     .setFont(textFont)
                     .setFontSize(12)
                     .setFontColor(ColorConstants.BLACK));
+
+            List<Double> hostLatencyData = latencyMap.get(host);
+            if (hostLatencyData != null && !hostLatencyData.isEmpty()) {
+                StringBuilder hostResults = new StringBuilder();
+                for (Double latency : hostLatencyData) {
+                    hostResults.append(String.format("Latency: %.2f ms\n", latency));
+                }
+                document.add(new Paragraph(hostResults.toString())
+                        .setFont(textFont)
+                        .setFontSize(12)
+                        .setFontColor(ColorConstants.BLACK));
+
+                document.add(new Paragraph("\n"));
+
+                String hostRecommendations = analyzeLatencyDataForHost(host);
+                document.add(new Paragraph("Recommendations:")
+                        .setFont(titleFont)
+                        .setFontSize(14)
+                        .setBold()
+                        .setFontColor(ColorConstants.DARK_GRAY));
+                document.add(new Paragraph(hostRecommendations)
+                        .setFont(textFont)
+                        .setFontSize(12)
+                        .setFontColor(ColorConstants.BLACK));
+                document.add(new Paragraph("\n"));
+            }
         }
 
-        // Add some space
-        document.add(new Paragraph("\n"));
-
-        // Generate chart and add to PDF
         BufferedImage chartImage = generateChartImage();
         ImageData imageData = ImageDataFactory.create(chartImage, null);
         Image pdfImage = new Image(imageData);
         document.add(pdfImage);
-
-        // Add some space
-        document.add(new Paragraph("\n"));
-
-        // Add Recommendations
-        document.add(new Paragraph("Recommendations:")
-                .setFont(titleFont)
-                .setFontSize(14)
-                .setBold()
-                .setFontColor(ColorConstants.DARK_GRAY));
-        String recommendations = analyzeLatencyData();
-        document.add(new Paragraph(recommendations)
-                .setFont(textFont)
-                .setFontSize(12)
-                .setFontColor(ColorConstants.BLACK));
-
-        // Close the document
         document.close();
-
         showAlert("Success", "Report saved successfully.");
     }
 
+    private String analyzeLatencyDataForHost(String host) {
+        List<Double> latencyData = latencyMap.get(host);
+        if (latencyData == null || latencyData.isEmpty()) {
+            return "No latency data available for analysis.";
+        }
 
+        double maxLatency = latencyData.stream().mapToDouble(v -> v).max().orElse(0.0);
+        double averageLatency = latencyData.stream().mapToDouble(v -> v).average().orElse(0.0);
+
+        StringBuilder recommendations = new StringBuilder();
+        recommendations.append(String.format("Maximum Latency: %.2f ms\n", maxLatency));
+        recommendations.append(String.format("Average Latency: %.2f ms\n", averageLatency));
+
+        if (averageLatency < 100) {
+            recommendations.append("Latency is good. Your network performance is excellent.\n");
+        } else if (averageLatency < 200) {
+            recommendations.append("Latency is acceptable. Your network performance is decent but could be improved.\n");
+        } else {
+            recommendations.append("Latency is poor. Consider checking your network connection or contacting your ISP.\n");
+        }
+
+        return recommendations.toString();
+    }
 
     private BufferedImage generateChartImage() {
         XYSeriesCollection dataset = new XYSeriesCollection();
-        dataset.addSeries(jFreeSeries);
+        for (XYSeries series : jFreeSeriesMap.values()) {
+            dataset.addSeries(series);
+        }
 
         JFreeChart chart = ChartFactory.createXYLineChart(
                 "Latency Over Time",
@@ -287,35 +326,33 @@ public class AnalyzerController {
 
         XYPlot plot = chart.getXYPlot();
         XYLineAndShapeRenderer renderer = new XYLineAndShapeRenderer();
-        renderer.setSeriesPaint(0, Color.BLUE);
         plot.setRenderer(renderer);
+        plot.setBackgroundPaint(Color.white);
+        plot.setRangeGridlinesVisible(true);
+        plot.setRangeGridlinePaint(Color.BLACK);
+        plot.setDomainGridlinesVisible(true);
+        plot.setDomainGridlinePaint(Color.BLACK);
 
         BufferedImage image = chart.createBufferedImage(600, 400);
         return image;
     }
 
-    private void showAlert(String title, String message) {
+    private void showAlert(String title, String content) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(title);
         alert.setHeaderText(null);
-        alert.setContentText(message);
+        alert.setContentText(content);
         alert.showAndWait();
     }
 
+    @FXML
     public void clearFields(ActionEvent actionEvent) {
-        hostField.clear();
+        hostsField.clear();
         resultArea.clear();
         recommendationArea.clear();
-        series.getData().clear();
-        jFreeSeries.clear();
-        latencyData.clear();
-        timeCounter = 0;
-        // Clear the chart data
+        seriesMap.clear();
+        jFreeSeriesMap.clear();
+        latencyMap.clear();
         latencyChart.getData().clear();
-
-        // Re-add the empty series to the chart
-        series = new XYChart.Series<>();
-        latencyChart.getData().add(series);
-
     }
 }

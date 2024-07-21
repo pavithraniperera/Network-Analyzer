@@ -21,7 +21,7 @@
         <Label text="Network Latency Analyzer" styleClass="title" />
         <HBox spacing="10">
             <Label text="Host:" styleClass="label"/>
-            <TextField fx:id="hostField" styleClass="textField"/>
+            <TextField fx:id="hostsField" styleClass="textField"/>
         </HBox>
         <HBox spacing="10">
             <Button text="Analyze" onAction="#analyzeLatency" styleClass="button"/>
