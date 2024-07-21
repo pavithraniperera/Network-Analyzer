@@ -59,8 +59,7 @@ public class AnalyzerController {
     private int timeCounter = 0;
     private AtomicBoolean running = new AtomicBoolean(false);
     private List<Double> latencyData = new ArrayList<>();
-    private Map<String, XYChart.Series<Number, Number>> hostSeriesMap = new HashMap<>();
-    private List<Color> colors = List.of(Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE, Color.PINK); // Add more colors as needed
+
 
 
     @FXML
