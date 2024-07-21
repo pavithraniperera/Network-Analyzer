@@ -1,0 +1,40 @@
+.title {
+    -fx-font-size: 30px;
+    -fx-padding: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2c3e50;
+    -fx-effect: dropshadow(gaussian, rgba(0, 255, 0, 0.29), 10, 0.5, 0, 0);
+}
+
+.label {
+    -fx-font-size: 17px;
+}
+
+.textField {
+    -fx-pref-width: 300px;
+}
+
+.button {
+    -fx-background-color: #4CAF50;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-pref-width: 200px;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+}
+.button:hover {
+    -fx-background-color: #2980b9;
+}
+
+.textArea {
+    -fx-font-family: monospace;
+    -fx-font-size: 17px;
+    -fx-padding: 10px;
+    -fx-border-color: rgba(152, 248, 125, 0.9);
+    -fx-border-radius: 3;
+}
+.text-area:focused {
+    -fx-border-color: #2b641e;
+    -fx-background-color: #e8e8e8;
+}
+

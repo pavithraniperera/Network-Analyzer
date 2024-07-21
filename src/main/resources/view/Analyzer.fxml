@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<?import javafx.scene.control.TextField?>
+
+<?import java.net.URL?>
+<AnchorPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="lk.ijse.Controller.AnalyzerController"
+            prefHeight="800.0" prefWidth="1000.0" >
+
+    <VBox alignment="CENTER" spacing="10" AnchorPane.topAnchor="10.0" AnchorPane.leftAnchor="10.0" AnchorPane.rightAnchor="10.0">
+        <Label text="Network Latency Analyzer" styleClass="title" />
+        <HBox spacing="10">
+            <Label text="Host:" styleClass="label"/>
+            <TextField fx:id="hostField" styleClass="textField"/>
+        </HBox>
+        <HBox spacing="10">
+            <Button text="Analyze" onAction="#analyzeLatency" styleClass="button"/>
+            <Button text="Stop" onAction="#stopAnalysis" styleClass="button"/>
+            <Button text="Clear" onAction="#clearFields" />
+        </HBox>
+        <TextArea fx:id="resultArea" prefHeight="200" prefWidth="400" styleClass="textArea" editable="false" />
+        <Button text="Generate Report" onAction="#generateReport" styleClass="button"/>
+        <LineChart fx:id="latencyChart" title="Latency Over Time" createSymbols="false">
+            <xAxis>
+                <NumberAxis label="Time (seconds)"/>
+            </xAxis>
+            <yAxis>
+                <NumberAxis label="Latency (ms)"/>
+            </yAxis>
+        </LineChart>
+        <TextArea fx:id="recommendationArea" layoutX="500.0" layoutY="50.0" prefHeight="200.0" prefWidth="480.0" styleClass="textArea" editable="false"/>
+    </VBox>
+    <stylesheets>
+        <URL value="@../styles.css"/>
+    </stylesheets>
+</AnchorPane>
